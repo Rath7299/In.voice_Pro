@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Mobile App Meta Tags for a premium feel -->
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Voice to Invoice AI Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for animations and specific UI elements */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background to simulate the "box" */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        /* The simulated phone screen container */
+        .phone-container {
+            width: 375px;
+            height: 812px; /* Standard phone aspect ratio */
+            background-color: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+            position: relative;
+            border: 8px solid #e5e7eb; /* Simulating a bezel */
+        }
+
+        /* Pulse animation for the listening state */
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.8);
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); /* Purple theme */
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 20px rgba(139, 92, 246, 0);
+            }
+            100% {
+                transform: scale(0.8);
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+            }
+        }
+
+        .listening-active .record-btn {
+            animation: pulse-ring 2s infinite;
+            background-color: #f3e8ff; /* Light purple */
+            color: #8b5cf6; /* Dark purple icon */
+        }
+
+        .record-btn {
+            transition: all 0.3s ease;
+        }
+
+        /* Loading dots animation */
+        .dot-flashing {
+            position: relative;
+            width: 8px;
+            height: 8px;
+            border-radius: 5px;
+            background-color: #8b5cf6;
+            color: #8b5cf6;
+            animation: dot-flashing 1s infinite linear alternate;
+            animation-delay: 0.5s;
+        }
+        .dot-flashing::before, .dot-flashing::after {
+            content: '';
+            display: inline-block;
+            position: absolute;
+            top: 0;
+        }
+        .dot-flashing::before {
+            left: -15px;
+            width: 8px;
+            height: 8px;
+            border-radius: 5px;
+            background-color: #8b5cf6;
+            color: #8b5cf6;
+            animation: dot-flashing 1s infinite alternate;
+            animation-delay: 0s;
+        }
+        .dot-flashing::after {
+            left: 15px;
+            width: 8px;
+            height: 8px;
+            border-radius: 5px;
+            background-color: #8b5cf6;
+            color: #8b5cf6;
+            animation: dot-flashing 1s infinite alternate;
+            animation-delay: 1s;
+        }
+
+        @keyframes dot-flashing {
+            0% {
+                background-color: #8b5cf6;
+            }
+            50%, 100% {
+                background-color: #e5e7eb;
+            }
+        }
+
+        /* Hide elements utility */
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- BEAUTIFUL BOT ANIMATIONS & STYLES --- */
+        
+        /* Magical Glowing Aura behind the bot */
+        .bot-aura {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            background: radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            z-index: 0;
+            animation: aura-pulse 3s infinite alternate;
+        }
+
+        @keyframes aura-pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            100% { transform: scale(1.3); opacity: 1; }
+        }
+
+        /* 3D Porcelain/Plastic Head */
+        .bot-head {
+            width: 120px;
+            height: 105px;
+            background: radial-gradient(circle at 35% 25%, #ffffff 0%, #f3f4f6 40%, #e5e7eb 80%, #d1d5db 100%);
+            border-radius: 45% 45% 40% 40% / 50% 50% 45% 45%;
+            box-shadow: 
+                -5px -5px 15px rgba(255,255,255,0.9),
+                10px 15px 25px rgba(0,0,0,0.12),
+                inset -4px -4px 10px rgba(0,0,0,0.05);
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: float-bot 4s ease-in-out infinite;
+        }
+
+        /* Gentle floating up and down */
+        @keyframes float-bot {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-12px); }
+        }
+
+        /* Dark Glass Screen */
+        .bot-visor {
+            width: 90px;
+            height: 46px;
+            background: linear-gradient(135deg, #111827 0%, #1f2937 50%, #030712 100%);
+            border-radius: 25px;
+            box-shadow: 
+                inset 0 4px 8px rgba(255,255,255,0.15),
+                inset 0 -4px 12px rgba(0,0,0,0.9),
+                0 6px 15px rgba(139, 92, 246, 0.25);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+
+        /* Visor Glass Reflection Highlight */
+        .bot-visor::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 8%;
+            width: 84%;
+            height: 40%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.12), transparent);
+            border-radius: 20px 20px 50% 50%;
+            pointer-events: none;
+        }
+
+        /* LED Glowing Eyes */
+        .bot-eyes {
+            display: flex;
+            gap: 16px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .bot-eye {
+            width: 16px;
+            height: 20px;
+            background: #a78bfa;
+            border-radius: 8px;
+            box-shadow: 0 0 10px #8b5cf6, 0 0 20px #8b5cf6;
+            animation: bot-blink 4s infinite;
+            transition: all 0.3s ease;
+        }
+
+        /* --- BOT STATES & EMOTIONS --- */
+
+        /* 1. Idle State (Natural Blinking) */
+        @keyframes bot-blink {
+            0%, 46%, 48%, 50%, 100% { transform: scaleY(1); }
+            47%, 49% { transform: scaleY(0.1); }
+        }
+
+        /* 2. Listening State (Pulsing Soundwaves) */
+        .listening-active .bot-aura {
+            background: radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%);
+            animation: aura-listen 0.8s infinite alternate;
+        }
+        
+        @keyframes aura-listen {
+            0% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1.6); opacity: 0.2; }
+        }
+
+        .listening-active .bot-visor {
+            box-shadow: 
+                inset 0 4px 8px rgba(255,255,255,0.15),
+                inset 0 -4px 12px rgba(0,0,0,0.9),
+                0 6px 25px rgba(139, 92, 246, 0.6);
+        }
+
+        .listening-active .bot-eyes {
+            gap: 24px;
+        }
+
+        .listening-active .bot-eye {
+            height: 8px;
+            width: 24px;
+            border-radius: 4px;
+            background: #d8b4fe;
+            box-shadow: 0 0 15px #d8b4fe, 0 0 30px #c084fc;
+            animation: bot-listen-wave 0.5s infinite alternate ease-in-out;
+        }
+
+        .listening-active .bot-eye:nth-child(2) {
+            animation-delay: 0.25s;
+        }
+
+        @keyframes bot-listen-wave {
+            0% { transform: scaleY(0.6); }
+            100% { transform: scaleY(1.8); }
+        }
+
+        /* 3. Processing State (Orange API Thinking Scanner) */
+        .processing-active .bot-aura {
+            background: radial-gradient(circle, rgba(245,158,11,0.2) 0%, transparent 70%);
+            animation: aura-think 2s infinite linear;
+        }
+
+        @keyframes aura-think {
+            0% { transform: scale(1.2) rotate(0deg); }
+            100% { transform: scale(1.2) rotate(360deg); }
+        }
+
+        .processing-active .bot-visor {
+            box-shadow: 
+                inset 0 4px 8px rgba(255,255,255,0.15),
+                inset 0 -4px 12px rgba(0,0,0,0.9),
+                0 6px 20px rgba(245, 158, 11, 0.4);
+        }
+
+        .processing-active .bot-eyes {
+            gap: 6px;
+            animation: bot-think-scan 1.2s infinite alternate ease-in-out;
+        }
+
+        .processing-active .bot-eye {
+            background: #fbbf24;
+            box-shadow: 0 0 12px #fbbf24, 0 0 24px #f59e0b;
+            height: 6px;
+            width: 12px;
+            border-radius: 3px;
+            animation: none;
+        }
+
+        @keyframes bot-think-scan {
+            0% { transform: translateX(-18px); }
+            100% { transform: translateX(18px); }
+        }
+
+        /* Receipt styling */
+        .receipt-paper {
+            background-color: #fff;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .receipt-paper::before, .receipt-paper::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background-size: 10px 10px;
+        }
+        .receipt-paper::before {
+            top: -5px;
+            background-image: radial-gradient(circle at 5px 0, transparent 6px, #fff 6px);
+        }
+        .receipt-paper::after {
+            bottom: -5px;
+            background-image: radial-gradient(circle at 5px 10px, transparent 6px, #fff 6px);
+        }
+
+        /* PAID Stamp */
+        .paid-stamp {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            font-size: 3rem;
+            font-weight: 800;
+            color: rgba(239, 68, 68, 0.3); /* Red with opacity */
+            border: 4px solid rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+            padding: 10px 20px;
+            pointer-events: none;
+            z-index: 10;
+            letter-spacing: 4px;
+        }
+
+        /* --- NEW UPGRADES CSS --- */
+        
+        /* Receipt Print Animation */
+        @keyframes print-slide {
+            0% { transform: translateY(-100%); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .animate-print {
+            animation: print-slide 0.8s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+
+        /* Voice Visualizer Bars */
+        .visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 24px;
+        }
+        .bar {
+            width: 4px;
+            background-color: #8b5cf6;
+            border-radius: 4px;
+            animation: eq-bounce 0.5s ease-in-out infinite alternate;
+        }
+        .bar:nth-child(1) { animation-delay: 0.1s; height: 40%; }
+        .bar:nth-child(2) { animation-delay: 0.3s; height: 80%; }
+        .bar:nth-child(3) { animation-delay: 0.0s; height: 100%; }
+        .bar:nth-child(4) { animation-delay: 0.2s; height: 60%; }
+        .bar:nth-child(5) { animation-delay: 0.4s; height: 50%; }
+
+        @keyframes eq-bounce {
+            0% { transform: scaleY(0.3); }
+            100% { transform: scaleY(1); }
+        }
+
+        /* Success Checkmark */
+        .success-checkmark {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #22c55e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            transform: scale(0);
+            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .success-checkmark.show {
+            transform: scale(1);
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Print Media Query: Hides the "phone" and just prints the receipt! */
+        @media print {
+            body { background: white; margin: 0; padding: 0; align-items: flex-start; }
+            .phone-container { width: 100%; height: auto; border: none; box-shadow: none; border-radius: 0; }
+            .receipt-paper { box-shadow: none; border: none; }
+            /* Hide everything that isn't the receipt */
+            #view-voice-input, .status-bar, #settings-modal, #payment-modal, .action-buttons-container, #btn-back, h1 { display: none !important; }
+            #view-invoice-result { padding: 0; background: white; }
+        }
+
+        /* Mobile Device Optimization - Makes it full screen on actual phones */
+        @media (max-width: 600px) {
+            body { 
+                background-color: white; 
+                align-items: flex-start; /* Aligns to top instead of center */
+            }
+            .phone-container { 
+                width: 100vw; 
+                height: 100vh; /* Fallback */
+                height: 100dvh; /* Modern mobile viewport height (fixes Safari/Chrome bottom menu bar bouncing) */
+                border: none; 
+                box-shadow: none; 
+                border-radius: 0; 
+            }
+            /* Hide the fake status bar on real phones */
+            .status-bar-mock {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="phone-container flex flex-col relative bg-white">
+        
+        <!-- Status Bar Mock -->
+        <div class="status-bar-mock flex justify-between items-center px-6 pt-4 pb-2 text-xs font-semibold text-gray-800 z-10 bg-white">
+            <span>2:31</span>
+            <div class="flex space-x-2 items-center">
+                <i class="fas fa-signal"></i>
+                <i class="fas fa-wifi"></i>
+                <i class="fas fa-battery-three-quarters"></i>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW 1: Voice Input Interface ==================== -->
+        <div id="view-voice-input" class="flex-1 flex flex-col px-6 pb-8 transition-opacity duration-500 w-full">
+            
+            <!-- Header -->
+            <div class="flex justify-between items-center mt-2 mb-8">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm shadow-sm">
+                        AI
+                    </div>
+                </div> <!-- Added missing closing div here -->
+                <button id="btn-settings" class="text-gray-400 hover:text-gray-600 flex items-center gap-1.5 text-sm font-medium transition-colors">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+            </div>
+
+            <!-- Beautiful Robot Avatar Area -->
+            <div class="flex-1 flex flex-col items-center justify-center -mt-10">
+                <div class="relative flex justify-center items-center mb-8 w-full h-40">
+                    <!-- Glowing Aura -->
+                    <div class="bot-aura"></div>
+                    
+                    <!-- 3D Bot Head -->
+                    <div class="bot-head">
+                        <!-- Glass Visor -->
+                        <div class="bot-visor">
+                            <!-- LED Eyes -->
+                            <div class="bot-eyes">
+                                <div class="bot-eye"></div>
+                                <div class="bot-eye"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Status Text -->
+                <h2 id="status-text" class="text-2xl font-bold text-gray-800 mb-2 text-center">Ready</h2>
+                <p id="sub-status-text" class="text-sm text-gray-500 text-center px-4">Tap to record your invoice command</p>
+                
+                <!-- Loading Animation (Hidden by default) -->
+                <div id="loading-indicator" class="hidden mt-6 h-6 flex items-center justify-center">
+                    <div class="dot-flashing"></div>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="flex flex-col items-center mt-auto mb-2 w-full">
+                
+                <!-- Live Transcript Display & Visualizer (Hidden by default) -->
+                <div id="live-transcript-container" class="hidden w-full mb-4 text-center">
+                    <div id="audio-visualizer" class="visualizer mb-3">
+                        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                    </div>
+                    <p id="live-transcript" class="text-sm font-medium text-purple-700 bg-purple-50 p-3 rounded-lg border border-purple-100 shadow-inner min-h-[44px] break-words">...</p>
+                </div>
+
+                <!-- Record Button -->
+                <button id="btn-record" class="record-btn w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 border border-purple-200 shadow-sm mb-6 hover:bg-purple-100 focus:outline-none shrink-0">
+                    <i class="fas fa-microphone text-3xl"></i>
+                </button>
+
+                <!-- Command Hint Box -->
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 w-full text-center shrink-0">
+                    <p class="text-xs text-gray-600 font-medium mb-1"><i class="fas fa-info-circle text-purple-500 mr-1"></i> Example Command</p>
+                    <p class="text-xs text-gray-400 italic">"2 Coca Cola, 1 fried rice, total 5600 kyats"</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW 2: Invoice Result View ==================== -->
+        <div id="view-invoice-result" class="hidden flex-1 flex flex-col px-6 pb-6 bg-gray-50 transition-opacity duration-500 w-full overflow-hidden">
+            
+            <!-- Header for Invoice View -->
+            <div class="flex justify-between items-center mb-4 mt-2 shrink-0">
+                <button id="btn-back" class="text-gray-600 hover:text-gray-900 p-2 -ml-2 transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1 class="text-sm font-bold text-gray-800">Invoice Draft</h1>
+                <div class="w-8"></div> <!-- Spacer for centering -->
+            </div>
+
+            <!-- Receipt Container (Scrollable) -->
+            <div id="receipt-paper" class="receipt-paper p-5 rounded-sm flex-1 overflow-y-auto mb-4 flex flex-col w-full shadow-sm relative">
+                
+                <!-- Hidden PAID stamp -->
+                <div id="paid-stamp" class="paid-stamp hidden">PAID</div>
+
+                <div class="text-center mb-4 border-b border-dashed border-gray-300 pb-4 shrink-0">
+                    <h2 class="text-xl font-bold text-gray-800">PITI STORE</h2>
+                    <p class="text-xs text-gray-500 mt-1">Walk-in Customer</p>
+                    <p id="receipt-datetime" class="text-[10px] text-gray-400 mt-1"></p>
+                </div>
+                
+                <!-- Dynamic Items List -->
+                <div id="invoice-items" class="space-y-3 mb-4 text-sm text-gray-700 flex-1">
+                    <!-- Items will be injected here via JS -->
+                </div>
+
+                <div class="border-t border-dashed border-gray-300 pt-4 mt-auto shrink-0">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600">Subtotal</span>
+                        <span id="invoice-subtotal" class="font-medium">0 MMK</span>
+                    </div>
+                    <div class="flex justify-between text-lg font-bold mt-2 text-gray-900">
+                        <span>TOTAL</span>
+                        <span id="invoice-total">0 MMK</span>
+                    </div>
+                </div>
+
+                <!-- Debug Transcript (Optional) -->
+                <div class="mt-6 p-3 bg-gray-100 rounded-lg text-xs text-gray-500 italic shrink-0 border border-gray-200">
+                    <span class="font-semibold text-gray-600 block mb-1 not-italic flex items-center"><i class="fas fa-comment-dots mr-1"></i> Voice Transcript:</span>
+                    <span id="transcript-text">"..."</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-3 shrink-0 mt-auto action-buttons-container">
+                <!-- Unpaid Actions -->
+                <div id="unpaid-actions" class="space-y-3">
+                    <button id="btn-pay" class="w-full py-3.5 bg-green-500 text-white rounded-xl font-medium shadow-md hover:bg-green-600 transition flex justify-center items-center">
+                        <i class="fas fa-wallet mr-2"></i> Proceed to Payment
+                    </button>
+                    <button id="btn-new-order-draft" class="w-full py-3.5 bg-white text-red-500 border border-red-200 rounded-xl font-medium hover:bg-red-50 transition shadow-sm">
+                        Cancel Order
+                    </button>
+                </div>
+                
+                <!-- Paid Actions (Hidden initially) -->
+                <div id="paid-actions" class="hidden space-y-3">
+                    <button id="btn-print" class="w-full py-3.5 bg-purple-600 text-white rounded-xl font-medium shadow-md hover:bg-purple-700 transition flex justify-center items-center">
+                        <i class="fas fa-print mr-2"></i> Print Receipt
+                    </button>
+                    <button id="btn-new-order" class="w-full py-3.5 bg-white text-gray-700 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition shadow-sm">
+                        New Order
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== Payment Modal ==================== -->
+        <div id="payment-modal" class="hidden absolute inset-0 bg-black/50 z-40 flex flex-col justify-end transition-opacity backdrop-blur-sm">
+            <div class="glass-panel w-full rounded-t-3xl p-6 shadow-2xl transform transition-transform duration-300 translate-y-0">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-gray-800">Select Payment Method</h3>
+                    <button id="btn-close-payment" class="text-gray-400 hover:text-gray-600 bg-gray-100/80 rounded-full w-8 h-8 flex items-center justify-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div id="payment-options-container" class="space-y-4 mb-6">
+                    <button class="payment-option-btn w-full flex items-center justify-between p-4 border border-gray-200/50 rounded-xl hover:border-purple-500 hover:bg-purple-50/50 transition-colors bg-white/50">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 mr-3">
+                                <i class="fas fa-qrcode text-xl"></i>
+                            </div>
+                            <span class="font-semibold text-gray-700">QR Code / Bank Transfer</span>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </button>
+                    
+                    <button class="payment-option-btn w-full flex items-center justify-between p-4 border border-gray-200/50 rounded-xl hover:border-green-500 hover:bg-green-50/50 transition-colors bg-white/50">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center text-green-600 mr-3">
+                                <i class="fas fa-money-bill-wave text-xl"></i>
+                            </div>
+                            <span class="font-semibold text-gray-700">Cash</span>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-400"></i>
+                    </button>
+                </div>
+
+                <div id="payment-processing" class="hidden flex flex-col items-center justify-center py-8">
+                    <div id="payment-loader" class="dot-flashing mb-4"></div>
+                    <div id="payment-success" class="success-checkmark mb-4 hidden">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <p id="payment-status-text" class="text-sm font-medium text-gray-600">Processing payment...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== Settings Modal ==================== -->
+        <div id="settings-modal" class="hidden absolute inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
+            <div class="glass-panel w-[85%] rounded-2xl p-6 shadow-2xl transform transition-all">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-lg font-bold text-gray-800">Settings</h3>
+                    <button id="btn-close-settings" class="text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-5">
+                    <label for="api-key-input" class="block text-sm font-semibold text-gray-700 mb-2">API Key</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-key text-gray-400 text-sm"></i>
+                        </div>
+                        <input type="password" id="api-key-input" placeholder="sk-..." class="w-full border border-gray-300 rounded-xl pl-9 pr-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-shadow">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle"></i> Saved locally in your browser.</p>
+                </div>
+                
+                <button id="btn-save-settings" class="w-full bg-purple-600 text-white rounded-xl py-3 font-medium hover:bg-purple-700 transition shadow-md">
+                    Save Configuration
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // UI Elements
+            const viewVoiceInput = document.getElementById('view-voice-input');
+            const viewInvoiceResult = document.getElementById('view-invoice-result');
+            
+            const btnRecord = document.getElementById('btn-record');
+            const btnBack = document.getElementById('btn-back');
+            const btnNewOrder = document.getElementById('btn-new-order');
+            const btnNewOrderDraft = document.getElementById('btn-new-order-draft');
+            
+            const statusText = document.getElementById('status-text');
+            const subStatusText = document.getElementById('sub-status-text');
+            const loadingIndicator = document.getElementById('loading-indicator');
+            
+            // Invoice Elements
+            const receiptPaper = document.getElementById('receipt-paper');
+            const receiptDatetime = document.getElementById('receipt-datetime');
+            const invoiceItemsContainer = document.getElementById('invoice-items');
+            const invoiceSubtotal = document.getElementById('invoice-subtotal');
+            const invoiceTotal = document.getElementById('invoice-total');
+            const transcriptText = document.getElementById('transcript-text');
+
+            const liveTranscriptContainer = document.getElementById('live-transcript-container');
+            const liveTranscriptText = document.getElementById('live-transcript');
+            const hintBox = document.querySelector('.bg-gray-50.border.border-gray-200');
+
+            // Payment & Print Elements
+            const btnPay = document.getElementById('btn-pay');
+            const btnPrint = document.getElementById('btn-print');
+            const unpaidActions = document.getElementById('unpaid-actions');
+            const paidActions = document.getElementById('paid-actions');
+            const paidStamp = document.getElementById('paid-stamp');
+            const paymentModal = document.getElementById('payment-modal');
+            const btnClosePayment = document.getElementById('btn-close-payment');
+            const paymentOptionsContainer = document.getElementById('payment-options-container');
+            const paymentOptionBtns = document.querySelectorAll('.payment-option-btn');
+            const paymentProcessing = document.getElementById('payment-processing');
+            const paymentLoader = document.getElementById('payment-loader');
+            const paymentSuccess = document.getElementById('payment-success');
+            const paymentStatusText = document.getElementById('payment-status-text');
+
+            // Settings Elements
+            const btnSettings = document.getElementById('btn-settings');
+            const settingsModal = document.getElementById('settings-modal');
+            const btnCloseSettings = document.getElementById('btn-close-settings');
+            const btnSaveSettings = document.getElementById('btn-save-settings');
+            const apiKeyInput = document.getElementById('api-key-input');
+
+            // State
+            let isRecording = false;
+            let finalTranscript = '';
+            
+            // Utility: Subtle haptic feedback for mobile devices
+            function triggerVibration() {
+                if (navigator.vibrate) {
+                    navigator.vibrate(50);
+                }
+            }
+            
+            // Load saved API key on startup
+            const savedApiKey = localStorage.getItem('voice_invoice_api_key');
+            if (savedApiKey) {
+                apiKeyInput.value = savedApiKey;
+            }
+
+            // Initialize Web Speech API
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            let recognition = null;
+
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                
+                recognition.onresult = function(event) {
+                    let interimTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        } else {
+                            interimTranscript += event.results[i][0].transcript;
+                        }
+                    }
+                    liveTranscriptText.innerText = finalTranscript + interimTranscript;
+                };
+
+                recognition.onerror = function(event) {
+                    console.error("Speech recognition error:", event.error);
+                    stopRecordingUI();
+                    liveTranscriptText.innerText = 'Microphone error: ' + event.error;
+                };
+
+                recognition.onend = function() {
+                    if (isRecording) {
+                        // Automatically stopped (e.g. by silence)
+                        stopRecordingUI();
+                        if (finalTranscript.trim() !== '') {
+                            handleAudioProcessing(finalTranscript);
+                        } else {
+                            resetToStart(); // No audio captured
+                        }
+                    }
+                };
+            } else {
+                console.warn("Speech Recognition not supported in this browser.");
+                alert("Your browser does not support voice recording. Please use Chrome or Safari.");
+            }
+
+            async function processWithAI(transcribedText) {
+                console.log("Processing with AI API:", transcribedText);
+                
+                // Retrieve the API key set by the user in the Settings modal
+                const apiKey = localStorage.getItem('voice_invoice_api_key') || ""; 
+
+                // If no API key is set, fallback to mock data so the UI doesn't break
+                if (!apiKey) {
+                    console.log("No API key provided, using mock data fallback with auto-detection.");
+                    return new Promise(resolve => {
+                        setTimeout(() => {
+                            let currency = "USD";
+                            let mockItems = [];
+                            
+                            // Simple character detection for the mock fallback
+                            const hasKhmer = /[\u1780-\u17FF]/.test(transcribedText);
+                            const hasBurmese = /[\u1000-\u109F]/.test(transcribedText);
+
+                            if (hasKhmer) {
+                                currency = "KHR";
+                                mockItems = [
+                                    { name: "បាយឆា (Fried Rice)", qty: 2, price: 6000, total: 12000 },
+                                    { name: "កូកាកូឡា (Coca Cola)", qty: 1, price: 2500, total: 2500 }
+                                ];
+                            } else if (hasBurmese) {
+                                currency = "MMK";
+                                mockItems = [
+                                    { name: "လက်ဖက်ရည် (Tea)", qty: 2, price: 1200, total: 2400 },
+                                    { name: "နန်းကြီးသုပ် (Nangyi Thoke)", qty: 1, price: 2000, total: 2000 }
+                                ];
+                            } else {
+                                mockItems = [
+                                    { name: "Cheeseburger", qty: 2, price: 5, total: 10 },
+                                    { name: "French Fries", qty: 1, price: 3, total: 3 }
+                                ];
+                            }
+                            let calculatedTotal = mockItems.reduce((sum, item) => sum + item.total, 0);
+                            
+                            resolve({
+                                transcript: transcribedText,
+                                items: mockItems,
+                                total: calculatedTotal,
+                                currency: currency,
+                                detected_language: hasKhmer ? "Khmer" : (hasBurmese ? "Burmese" : "English")
+                            });
+                        }, 1500); // Simulate API latency
+                    });
+                }
+
+                // REAL CHATGPT API CALL
+                try {
+                    // Instruct ChatGPT to automatically detect language, extract items, and determine currency
+                    const prompt = `
+                        Analyze this voice transcript for a customer order: "${transcribedText}"
+                        
+                        1. Detect the language of the transcript (English, Khmer, or Burmese).
+                        2. Extract the items requested and their quantities.
+                        3. Estimate a standard, realistic market price for each item. 
+                        4. Calculate the total for each item (qty * price).
+                        5. Calculate the grand total.
+                        6. Assign the correct currency based on the detected language (English = USD, Khmer = KHR, Burmese = MMK).
+                        
+                        Format the output EXACTLY as this JSON structure:
+                        {
+                            "detected_language": "Language Name",
+                            "items": [
+                                { "name": "Item Name", "qty": 2, "price": 5.00, "total": 10.00 }
+                            ],
+                            "total": 10.00,
+                            "currency": "CURRENCY_CODE"
+                        }
+                    `;
+
+                    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "gpt-3.5-turbo",
+                            response_format: { type: "json_object" }, // Forces output to be valid JSON
+                            messages: [
+                                { 
+                                    role: "system", 
+                                    content: "You are a helpful POS system assistant that parses voice orders into structured JSON invoices. You estimate realistic prices based on typical market rates when exact prices are not provided in the prompt." 
+                                },
+                                { 
+                                    role: "user", 
+                                    content: prompt 
+                                }
+                            ]
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const err = await response.json();
+                        throw new Error(err.error?.message || "Failed to fetch from OpenAI");
+                    }
+
+                    const data = await response.json();
+                    
+                    // Parse the JSON string returned by ChatGPT
+                    const result = JSON.parse(data.choices[0].message.content);
+                    
+                    // Attach the original transcript for the receipt UI
+                    result.transcript = transcribedText;
+                    console.log(`AI Detected Language: ${result.detected_language}, Currency: ${result.currency}`);
+                    
+                    return result;
+
+                } catch (error) {
+                    console.error("AI Processing Error:", error);
+                    alert("Error calling ChatGPT API: " + error.message);
+                    throw error; // Let the caller function (handleAudioProcessing) handle the UI error state
+                }
+            }
+
+            // UI Actions
+            function startRecordingUI() {
+                triggerVibration();
+                isRecording = true;
+                finalTranscript = '';
+                
+                viewVoiceInput.classList.remove('processing-active');
+                viewVoiceInput.classList.add('listening-active');
+                btnRecord.innerHTML = '<i class="fas fa-stop text-3xl"></i>';
+                btnRecord.classList.replace('text-purple-600', 'text-red-500');
+                
+                statusText.innerText = 'Listening...';
+                subStatusText.innerText = 'Tap to stop or wait for silence';
+                loadingIndicator.classList.add('hidden');
+                
+                hintBox.classList.add('hidden');
+                liveTranscriptContainer.classList.remove('hidden');
+                liveTranscriptText.innerText = '...';
+            }
+
+            function stopRecordingUI() {
+                triggerVibration();
+                isRecording = false;
+                
+                viewVoiceInput.classList.remove('listening-active');
+                viewVoiceInput.classList.add('processing-active');
+                btnRecord.innerHTML = '<i class="fas fa-microphone text-3xl"></i>';
+                btnRecord.classList.replace('text-red-500', 'text-purple-600');
+                
+                statusText.innerText = 'Processing...';
+                subStatusText.innerText = 'Generating your invoice';
+                loadingIndicator.classList.remove('hidden');
+                
+                // Hide visualizer bars during processing
+                document.getElementById('audio-visualizer').classList.add('hidden');
+            }
+
+            function startRecording() {
+                if (!recognition) return;
+                
+                // Removing manual language selection allows the browser to attempt multi-lingual/default detection
+                startRecordingUI();
+                
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.error(e);
+                    stopRecordingUI();
+                }
+            }
+
+            function stopRecording() {
+                if (!recognition) return;
+                recognition.stop(); // This will trigger onend, which handles the processing
+            }
+
+            async function handleAudioProcessing(transcribedText) {
+                try {
+                    // Call our placeholder API function with the real transcript (Language is auto-detected now)
+                    const data = await processWithAI(transcribedText);
+                    
+                    // Clear previous items
+                    invoiceItemsContainer.innerHTML = '';
+                    
+                    // Set current Date & Time
+                    const now = new Date();
+                    receiptDatetime.innerText = now.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+                    
+                    // Loop through the items and add them to the UI
+                    data.items.forEach(item => {
+                        const itemEl = document.createElement('div');
+                        itemEl.className = 'flex justify-between items-start';
+                        itemEl.innerHTML = `
+                            <div class="flex-1 pr-4">
+                                <span class="font-medium text-gray-800">${item.qty} x</span> ${item.name}
+                            </div>
+                            <div class="font-medium text-gray-800">${item.total.toLocaleString()} ${data.currency}</div>
+                        `;
+                        invoiceItemsContainer.appendChild(itemEl);
+                    });
+
+                    // Update totals
+                    invoiceSubtotal.innerText = `${data.total.toLocaleString()} ${data.currency}`;
+                    invoiceTotal.innerText = `${data.total.toLocaleString()} ${data.currency}`;
+                    transcriptText.innerText = `"${data.transcript}"`;
+                    
+                    // Switch to Result View & trigger printer animation
+                    viewVoiceInput.classList.add('hidden');
+                    viewInvoiceResult.classList.remove('hidden');
+                    
+                    // Re-trigger the print animation
+                    receiptPaper.classList.remove('animate-print');
+                    void receiptPaper.offsetWidth; // trigger reflow
+                    receiptPaper.classList.add('animate-print');
+                    
+                } catch (error) {
+                    console.error("Error processing invoice:", error);
+                    statusText.innerText = 'Error';
+                    subStatusText.innerText = 'Something went wrong. Please try again.';
+                    loadingIndicator.classList.add('hidden');
+                    setTimeout(resetToStart, 3000);
+                }
+            }
+
+            function resetToStart() {
+                viewInvoiceResult.classList.add('hidden');
+                viewVoiceInput.classList.remove('hidden');
+                
+                // Reset Payment/Receipt States
+                paidStamp.classList.add('hidden');
+                unpaidActions.classList.remove('hidden');
+                paidActions.classList.add('hidden');
+                
+                // Reset Robot Emotion State
+                viewVoiceInput.classList.remove('listening-active', 'processing-active');
+                
+                statusText.innerText = 'Ready';
+                subStatusText.innerText = 'Tap to record your invoice command';
+                loadingIndicator.classList.add('hidden');
+                hintBox.classList.remove('hidden');
+                liveTranscriptContainer.classList.add('hidden');
+                document.getElementById('audio-visualizer').classList.remove('hidden');
+                liveTranscriptText.innerText = '';
+                finalTranscript = '';
+            }
+
+            // Event Listeners for main flow
+            btnRecord.addEventListener('click', () => {
+                if (!isRecording) {
+                    startRecording();
+                } else {
+                    stopRecording();
+                }
+            });
+
+            btnBack.addEventListener('click', () => { triggerVibration(); resetToStart(); });
+            btnNewOrder.addEventListener('click', () => { triggerVibration(); resetToStart(); });
+            btnNewOrderDraft.addEventListener('click', () => { triggerVibration(); resetToStart(); });
+
+            // Event Listeners for Payment Flow
+            btnPay.addEventListener('click', () => {
+                triggerVibration();
+                paymentModal.classList.remove('hidden');
+                
+                // Reset payment modal state in case it was opened before
+                paymentOptionsContainer.classList.remove('hidden');
+                paymentProcessing.classList.add('hidden');
+                paymentLoader.classList.remove('hidden');
+                paymentSuccess.classList.remove('show', 'flex');
+                paymentSuccess.classList.add('hidden');
+                paymentStatusText.innerText = 'Processing payment...';
+            });
+
+            btnClosePayment.addEventListener('click', () => {
+                triggerVibration();
+                paymentModal.classList.add('hidden');
+            });
+
+            paymentOptionBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    triggerVibration();
+                    // Hide options, show processing
+                    paymentOptionsContainer.classList.add('hidden');
+                    paymentProcessing.classList.remove('hidden');
+                    
+                    // Simulate API payment delay
+                    setTimeout(() => {
+                        // Show success checkmark
+                        paymentLoader.classList.add('hidden');
+                        paymentSuccess.classList.remove('hidden');
+                        paymentSuccess.classList.add('flex');
+                        
+                        // Small timeout to allow display:flex to apply before animating scale
+                        setTimeout(() => {
+                            paymentSuccess.classList.add('show');
+                            paymentStatusText.innerText = 'Payment Successful!';
+                            triggerVibration();
+                        }, 50);
+
+                        // Wait a moment then close modal and update receipt
+                        setTimeout(() => {
+                            paymentModal.classList.add('hidden');
+                            
+                            // Update Invoice to PAID state
+                            paidStamp.classList.remove('hidden');
+                            unpaidActions.classList.add('hidden');
+                            paidActions.classList.remove('hidden');
+                        }, 1200);
+                        
+                    }, 1500);
+                });
+            });
+
+            // Event Listener for Print Flow
+            btnPrint.addEventListener('click', () => {
+                triggerVibration();
+                window.print();
+            });
+
+            // Event Listeners for Settings Modal
+            btnSettings.addEventListener('click', () => {
+                triggerVibration();
+                settingsModal.classList.remove('hidden');
+            });
+
+            const closeSettings = () => {
+                triggerVibration();
+                settingsModal.classList.add('hidden');
+            };
+
+            btnCloseSettings.addEventListener('click', closeSettings);
+
+            btnSaveSettings.addEventListener('click', () => {
+                const key = apiKeyInput.value.trim();
+                localStorage.setItem('voice_invoice_api_key', key);
+                closeSettings();
+                
+                // Optional visual feedback
+                const originalText = btnSaveSettings.innerText;
+                btnSaveSettings.innerText = 'Saved!';
+                btnSaveSettings.classList.replace('bg-purple-600', 'bg-green-500');
+                
+                setTimeout(() => {
+                    btnSaveSettings.innerText = originalText;
+                    btnSaveSettings.classList.replace('bg-green-500', 'bg-purple-600');
+                }, 1000);
+            });
+        });
+    </script>
+</body>
+</html>
