@@ -709,7 +709,8 @@
 
             // State
             let isRecording = false;
-            let finalTranscript = '';
+            let mediaRecorder;
+            let audioChunks = [];
             
             // Utility: Subtle haptic feedback for mobile devices
             function triggerVibration() {
@@ -724,64 +725,126 @@
                 apiKeyInput.value = savedApiKey;
             }
 
-            // Initialize Web Speech API
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            let recognition = null;
+            // ==========================================
+            // STEP 1: RECORD RAW AUDIO (MEDIA RECORDER)
+            // ==========================================
+            async function startRecording() {
+                try {
+                    // Request microphone access
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
 
-            if (SpeechRecognition) {
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                
-                recognition.onresult = function(event) {
-                    let interimTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        } else {
-                            interimTranscript += event.results[i][0].transcript;
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) {
+                            audioChunks.push(event.data);
                         }
-                    }
-                    liveTranscriptText.innerText = finalTranscript + interimTranscript;
-                };
+                    };
 
-                recognition.onerror = function(event) {
-                    console.error("Speech recognition error:", event.error);
-                    stopRecordingUI();
-                    liveTranscriptText.innerText = 'Microphone error: ' + event.error;
-                };
+                    mediaRecorder.onstop = async () => {
+                        // Package the audio chunks into a playable audio file Blob
+                        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+                        // Send the actual audio file to OpenAI Whisper
+                        await processAudioWithWhisper(audioBlob);
+                    };
 
-                recognition.onend = function() {
-                    if (isRecording) {
-                        // Automatically stopped (e.g. by silence)
-                        stopRecordingUI();
-                        if (finalTranscript.trim() !== '') {
-                            handleAudioProcessing(finalTranscript);
-                        } else {
-                            resetToStart(); // No audio captured
-                        }
-                    }
-                };
-            } else {
-                console.warn("Speech Recognition not supported in this browser.");
-                alert("Your browser does not support voice recording. Please use Chrome or Safari.");
+                    mediaRecorder.start();
+                    startRecordingUI();
+
+                } catch (err) {
+                    console.error("Microphone access error:", err);
+                    alert("Please allow microphone access in your browser to record your voice.");
+                    resetToStart();
+                }
             }
 
-            async function processWithAI(transcribedText) {
-                console.log("Processing with AI API:", transcribedText);
+            function stopRecording() {
+                if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                    mediaRecorder.stop();
+                    // Stop all audio tracks to release the microphone hardware completely
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    stopRecordingUI();
+                }
+            }
+
+            // ==========================================
+            // STEP 2: WHISPER API (AUDIO TO TEXT)
+            // ==========================================
+            async function processAudioWithWhisper(audioBlob) {
+                const apiKey = localStorage.getItem('voice_invoice_api_key') || "";
                 
-                // Retrieve the API key set by the user in the Settings modal
+                // Fallback Mock Mode if no API Key is provided
+                if (!apiKey) {
+                    liveTranscriptText.innerText = "Transcribing audio (Mock Mode)...";
+                    setTimeout(() => {
+                        let mockText = "I want 2 burgers and 1 coke";
+                        if(currentVoiceLang === 'km-KH') mockText = "បាយឆា ២ កូកាកូឡា ១";
+                        if(currentVoiceLang === 'my-MM') mockText = "လက်ဖက်ရည် ၂ ခွက်";
+                        
+                        liveTranscriptText.innerText = `"${mockText}"\n\nExtracting invoice items...`;
+                        handleAudioProcessing(mockText);
+                    }, 1500);
+                    return;
+                }
+
+                try {
+                    liveTranscriptText.innerText = "Uploading audio to Whisper AI...";
+                    
+                    const formData = new FormData();
+                    
+                    // Determine file extension (Safari uses mp4, Chrome uses webm)
+                    const ext = audioBlob.type.includes('mp4') ? 'm4a' : 'webm';
+                    formData.append("file", new File([audioBlob], `recording.${ext}`, { type: audioBlob.type }));
+                    formData.append("model", "whisper-1");
+                    
+                    // Tell Whisper exactly which language to expect for perfect accuracy
+                    let whisperLang = 'en';
+                    if (currentVoiceLang === 'km-KH') whisperLang = 'km'; // Khmer
+                    if (currentVoiceLang === 'my-MM') whisperLang = 'my'; // Burmese
+                    formData.append("language", whisperLang);
+
+                    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: formData
+                    });
+
+                    if (!whisperResponse.ok) {
+                        const err = await whisperResponse.json();
+                        throw new Error(err.error?.message || "Whisper API failed");
+                    }
+
+                    const whisperData = await whisperResponse.json();
+                    const transcribedText = whisperData.text;
+                    
+                    // Show the transcribed text on screen
+                    liveTranscriptText.innerText = `"${transcribedText}"\n\nAI is formatting your invoice...`;
+                    
+                    // Pass the perfectly transcribed text to ChatGPT to build the invoice
+                    await handleAudioProcessing(transcribedText);
+
+                } catch (error) {
+                    console.error("Whisper Error:", error);
+                    alert("Error converting voice to text: " + error.message);
+                    resetToStart();
+                }
+            }
+
+            // ==========================================
+            // STEP 3: CHATGPT API (TEXT TO INVOICE JSON)
+            // ==========================================
+            async function processWithAI(transcribedText) {
                 const apiKey = localStorage.getItem('voice_invoice_api_key') || ""; 
 
-                // If no API key is set, fallback to mock data so the UI doesn't break
                 if (!apiKey) {
-                    console.log("No API key provided, using mock data fallback with auto-detection.");
+                    // MOCK DATA FALLBACK
                     return new Promise(resolve => {
                         setTimeout(() => {
                             let currency = "USD";
                             let mockItems = [];
                             
-                            // Simple character detection for the mock fallback
                             const hasKhmer = /[\u1780-\u17FF]/.test(transcribedText);
                             const hasBurmese = /[\u1000-\u109F]/.test(transcribedText);
 
@@ -812,20 +875,17 @@
                                 currency: currency,
                                 detected_language: hasKhmer ? "Khmer" : (hasBurmese ? "Burmese" : "English")
                             });
-                        }, 1500); // Simulate API latency
+                        }, 1000);
                     });
                 }
 
-                // REAL CHATGPT API CALL
                 try {
-                    // Instruct ChatGPT to automatically detect language, extract items, and determine currency
                     const prompt = `
                         Analyze this voice transcript for a customer order: "${transcribedText}"
                         
                         1. Detect the language of the transcript (English, Khmer, or Burmese).
                         2. Extract the items requested and their quantities. 
-                           - IMPORTANT RULE: If the customer lists multiple items but doesn't say a number/quantity (e.g., "fried rice and coca cola"), you MUST assume the quantity is 1 for each item.
-                           - Extract EVERY distinct item they mention, even if spoken quickly in one long sentence.
+                           - IMPORTANT RULE: If the customer lists multiple items but doesn't say a number/quantity (e.g., "fried rice, a coke, and soup"), you MUST assume the quantity is 1 for each item. Scan the text carefully and separate every distinct item.
                         3. Estimate a standard, realistic market price for each item. 
                         4. Calculate the total for each item (qty * price).
                         5. Calculate the grand total.
@@ -850,11 +910,11 @@
                         },
                         body: JSON.stringify({
                             model: "gpt-3.5-turbo",
-                            response_format: { type: "json_object" }, // Forces output to be valid JSON
+                            response_format: { type: "json_object" }, 
                             messages: [
                                 { 
                                     role: "system", 
-                                    content: "You are a helpful POS system assistant that parses voice orders into structured JSON invoices. You estimate realistic prices based on typical market rates when exact prices are not provided in the prompt." 
+                                    content: "You are a helpful POS system assistant that parses voice orders into structured JSON invoices. You separate multi-item orders correctly and estimate realistic prices based on typical market rates when exact prices are not provided." 
                                 },
                                 { 
                                     role: "user", 
@@ -870,28 +930,23 @@
                     }
 
                     const data = await response.json();
-                    
-                    // Parse the JSON string returned by ChatGPT
                     const result = JSON.parse(data.choices[0].message.content);
-                    
-                    // Attach the original transcript for the receipt UI
                     result.transcript = transcribedText;
-                    console.log(`AI Detected Language: ${result.detected_language}, Currency: ${result.currency}`);
-                    
                     return result;
 
                 } catch (error) {
                     console.error("AI Processing Error:", error);
                     alert("Error calling ChatGPT API: " + error.message);
-                    throw error; // Let the caller function (handleAudioProcessing) handle the UI error state
+                    throw error; 
                 }
             }
 
-            // UI Actions
+            // ==========================================
+            // UI STATE MANAGEMENT
+            // ==========================================
             function startRecordingUI() {
                 triggerVibration();
                 isRecording = true;
-                finalTranscript = '';
                 
                 viewVoiceInput.classList.remove('processing-active');
                 viewVoiceInput.classList.add('listening-active');
@@ -899,12 +954,13 @@
                 btnRecord.classList.replace('text-purple-600', 'text-red-500');
                 
                 statusText.innerText = 'Listening...';
-                subStatusText.innerText = 'Tap to stop or wait for silence';
+                subStatusText.innerText = 'Tap to stop recording';
                 loadingIndicator.classList.add('hidden');
                 
                 hintBox.classList.add('hidden');
                 liveTranscriptContainer.classList.remove('hidden');
-                liveTranscriptText.innerText = '...';
+                document.getElementById('audio-visualizer').classList.remove('hidden');
+                liveTranscriptText.innerText = 'Recording your voice...';
             }
 
             function stopRecordingUI() {
@@ -920,44 +976,17 @@
                 subStatusText.innerText = 'Generating your invoice';
                 loadingIndicator.classList.remove('hidden');
                 
-                // Hide visualizer bars during processing
                 document.getElementById('audio-visualizer').classList.add('hidden');
-            }
-
-            function startRecording() {
-                if (!recognition) return;
-                
-                // CRITICAL FIX: Tell the microphone which language to listen for
-                recognition.lang = currentVoiceLang; 
-                
-                startRecordingUI();
-                
-                try {
-                    recognition.start();
-                } catch(e) {
-                    console.error(e);
-                    stopRecordingUI();
-                }
-            }
-
-            function stopRecording() {
-                if (!recognition) return;
-                recognition.stop(); // This will trigger onend, which handles the processing
             }
 
             async function handleAudioProcessing(transcribedText) {
                 try {
-                    // Call our placeholder API function with the real transcript (Language is auto-detected now)
                     const data = await processWithAI(transcribedText);
                     
-                    // Clear previous items
                     invoiceItemsContainer.innerHTML = '';
-                    
-                    // Set current Date & Time
                     const now = new Date();
                     receiptDatetime.innerText = now.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
                     
-                    // Loop through the items and add them to the UI
                     data.items.forEach(item => {
                         const itemEl = document.createElement('div');
                         itemEl.className = 'flex justify-between items-start';
@@ -970,16 +999,13 @@
                         invoiceItemsContainer.appendChild(itemEl);
                     });
 
-                    // Update totals
                     invoiceSubtotal.innerText = `${data.total.toLocaleString()} ${data.currency}`;
                     invoiceTotal.innerText = `${data.total.toLocaleString()} ${data.currency}`;
                     transcriptText.innerText = `"${data.transcript}"`;
                     
-                    // Switch to Result View & trigger printer animation
                     viewVoiceInput.classList.add('hidden');
                     viewInvoiceResult.classList.remove('hidden');
                     
-                    // Re-trigger the print animation
                     receiptPaper.classList.remove('animate-print');
                     void receiptPaper.offsetWidth; // trigger reflow
                     receiptPaper.classList.add('animate-print');
@@ -997,12 +1023,10 @@
                 viewInvoiceResult.classList.add('hidden');
                 viewVoiceInput.classList.remove('hidden');
                 
-                // Reset Payment/Receipt States
                 paidStamp.classList.add('hidden');
                 unpaidActions.classList.remove('hidden');
                 paidActions.classList.add('hidden');
                 
-                // Reset Robot Emotion State
                 viewVoiceInput.classList.remove('listening-active', 'processing-active');
                 
                 statusText.innerText = 'Ready';
@@ -1010,12 +1034,12 @@
                 loadingIndicator.classList.add('hidden');
                 hintBox.classList.remove('hidden');
                 liveTranscriptContainer.classList.add('hidden');
-                document.getElementById('audio-visualizer').classList.remove('hidden');
                 liveTranscriptText.innerText = '';
-                finalTranscript = '';
             }
 
-            // Event Listeners for main flow
+            // ==========================================
+            // EVENT LISTENERS
+            // ==========================================
             btnRecord.addEventListener('click', () => {
                 if (!isRecording) {
                     startRecording();
@@ -1024,22 +1048,19 @@
                 }
             });
             
-            // Event Listeners for Language Toggle
+            // Language Toggle
             langBtns.forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     triggerVibration();
-                    // Remove active state from all
                     langBtns.forEach(b => {
                         b.classList.remove('active', 'bg-white', 'shadow-sm', 'text-purple-700', 'font-bold');
                         b.classList.add('text-gray-500', 'font-semibold');
                     });
                     
-                    // Add active state to clicked button
                     const clicked = e.target;
                     clicked.classList.remove('text-gray-500', 'font-semibold');
                     clicked.classList.add('active', 'bg-white', 'shadow-sm', 'text-purple-700', 'font-bold');
                     
-                    // Update the state variable
                     currentVoiceLang = clicked.getAttribute('data-lang');
                 });
             });
@@ -1048,12 +1069,10 @@
             btnNewOrder.addEventListener('click', () => { triggerVibration(); resetToStart(); });
             btnNewOrderDraft.addEventListener('click', () => { triggerVibration(); resetToStart(); });
 
-            // Event Listeners for Payment Flow
+            // Payment Flow
             btnPay.addEventListener('click', () => {
                 triggerVibration();
                 paymentModal.classList.remove('hidden');
-                
-                // Reset payment modal state in case it was opened before
                 paymentOptionsContainer.classList.remove('hidden');
                 paymentProcessing.classList.add('hidden');
                 paymentLoader.classList.remove('hidden');
@@ -1070,29 +1089,22 @@
             paymentOptionBtns.forEach(btn => {
                 btn.addEventListener('click', () => {
                     triggerVibration();
-                    // Hide options, show processing
                     paymentOptionsContainer.classList.add('hidden');
                     paymentProcessing.classList.remove('hidden');
                     
-                    // Simulate API payment delay
                     setTimeout(() => {
-                        // Show success checkmark
                         paymentLoader.classList.add('hidden');
                         paymentSuccess.classList.remove('hidden');
                         paymentSuccess.classList.add('flex');
                         
-                        // Small timeout to allow display:flex to apply before animating scale
                         setTimeout(() => {
                             paymentSuccess.classList.add('show');
                             paymentStatusText.innerText = 'Payment Successful!';
                             triggerVibration();
                         }, 50);
 
-                        // Wait a moment then close modal and update receipt
                         setTimeout(() => {
                             paymentModal.classList.add('hidden');
-                            
-                            // Update Invoice to PAID state
                             paidStamp.classList.remove('hidden');
                             unpaidActions.classList.add('hidden');
                             paidActions.classList.remove('hidden');
@@ -1102,13 +1114,12 @@
                 });
             });
 
-            // Event Listener for Print Flow
             btnPrint.addEventListener('click', () => {
                 triggerVibration();
                 window.print();
             });
 
-            // Event Listeners for Settings Modal
+            // Settings Modal
             btnSettings.addEventListener('click', () => {
                 triggerVibration();
                 settingsModal.classList.remove('hidden');
@@ -1126,7 +1137,6 @@
                 localStorage.setItem('voice_invoice_api_key', key);
                 closeSettings();
                 
-                // Optional visual feedback
                 const originalText = btnSaveSettings.innerText;
                 btnSaveSettings.innerText = 'Saved!';
                 btnSaveSettings.classList.replace('bg-purple-600', 'bg-green-500');
