@@ -798,13 +798,15 @@
                     formData.append("model", "whisper-1");
                     
                     // OPENAI API FIX: Whisper API strictly rejects 'km' and 'my' as language parameters.
-                    // Solution: Only enforce 'en', and use "prompt hints" for Khmer/Burmese to trigger auto-detection.
+                    // Solution: Only enforce 'en', and use native-alphabet "prompt hints" to force native script output.
                     if (currentVoiceLang === 'en-US') {
                         formData.append("language", "en");
                     } else if (currentVoiceLang === 'km-KH') {
-                        formData.append("prompt", "This is a customer order spoken in Khmer (Cambodian).");
+                        // Prompting IN Khmer forces Whisper to output Khmer script instead of English letters
+                        formData.append("prompt", "សូមសរសេរជាអក្សរខ្មែរ។ អតិថិជនកុម្ម៉ង់ម្ហូប។ ឧទាហរណ៍៖ បាយឆា ២ កូកាកូឡា ១។");
                     } else if (currentVoiceLang === 'my-MM') {
-                        formData.append("prompt", "This is a customer order spoken in Burmese (Myanmar).");
+                        // Prompting IN Burmese forces Whisper to output Burmese script
+                        formData.append("prompt", "မြန်မာစာဖြင့်ရေးပါ။ ဖောက်သည်၏ မှာယူမှုဖြစ်သည်။ ဥပမာ- လက်ဖက်ရည် ၂ ခွက်။");
                     }
 
                     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -888,8 +890,10 @@
                         Analyze this voice transcript for a customer order: "${transcribedText}"
                         
                         1. Detect the language of the transcript (English, Khmer, or Burmese).
-                        2. Extract the items requested and their quantities. 
+                        2. Extract ONLY the actual food, drink, or retail items requested and their quantities. 
+                           - STRICT RULE: IGNORE greetings (like "hello", "hi"), conversational filler ("I want", "please", "can I get"), and unrelated words. Do NOT list conversational words as items.
                            - IMPORTANT RULE: If the customer lists multiple items but doesn't say a number/quantity (e.g., "fried rice, a coke, and soup"), you MUST assume the quantity is 1 for each item. Scan the text carefully and separate every distinct item.
+                           - Output the item names in the native script they were spoken in.
                         3. Estimate a standard, realistic market price for each item. 
                         4. Calculate the total for each item (qty * price).
                         5. Calculate the grand total.
