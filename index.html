@@ -797,11 +797,15 @@
                     formData.append("file", new File([audioBlob], `recording.${ext}`, { type: audioBlob.type }));
                     formData.append("model", "whisper-1");
                     
-                    // Tell Whisper exactly which language to expect for perfect accuracy
-                    let whisperLang = 'en';
-                    if (currentVoiceLang === 'km-KH') whisperLang = 'km'; // Khmer
-                    if (currentVoiceLang === 'my-MM') whisperLang = 'my'; // Burmese
-                    formData.append("language", whisperLang);
+                    // OPENAI API FIX: Whisper API strictly rejects 'km' and 'my' as language parameters.
+                    // Solution: Only enforce 'en', and use "prompt hints" for Khmer/Burmese to trigger auto-detection.
+                    if (currentVoiceLang === 'en-US') {
+                        formData.append("language", "en");
+                    } else if (currentVoiceLang === 'km-KH') {
+                        formData.append("prompt", "This is a customer order spoken in Khmer (Cambodian).");
+                    } else if (currentVoiceLang === 'my-MM') {
+                        formData.append("prompt", "This is a customer order spoken in Burmese (Myanmar).");
+                    }
 
                     const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                         method: 'POST',
