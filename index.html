@@ -492,6 +492,13 @@
                     <p id="live-transcript" class="text-sm font-medium text-purple-700 bg-purple-50 p-3 rounded-lg border border-purple-100 shadow-inner min-h-[44px] break-words">...</p>
                 </div>
 
+                <!-- Language Selector Pill -->
+                <div class="flex bg-gray-100/80 backdrop-blur-sm rounded-full p-1 mb-5 w-48 mx-auto shrink-0 border border-gray-200 shadow-inner">
+                    <button class="lang-btn active flex-1 text-xs font-bold py-2 rounded-full bg-white shadow-sm text-purple-700 transition-all" data-lang="en-US">EN</button>
+                    <button class="lang-btn flex-1 text-xs font-semibold py-2 rounded-full text-gray-500 hover:text-gray-800 transition-all" data-lang="km-KH">KH</button>
+                    <button class="lang-btn flex-1 text-xs font-semibold py-2 rounded-full text-gray-500 hover:text-gray-800 transition-all" data-lang="my-MM">MM</button>
+                </div>
+
                 <!-- Record Button -->
                 <button id="btn-record" class="record-btn w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center text-purple-600 border border-purple-200 shadow-sm mb-6 hover:bg-purple-100 focus:outline-none shrink-0">
                     <i class="fas fa-microphone text-3xl"></i>
@@ -695,6 +702,10 @@
             const btnCloseSettings = document.getElementById('btn-close-settings');
             const btnSaveSettings = document.getElementById('btn-save-settings');
             const apiKeyInput = document.getElementById('api-key-input');
+            
+            // Language Elements
+            const langBtns = document.querySelectorAll('.lang-btn');
+            let currentVoiceLang = 'en-US'; // Default to English
 
             // State
             let isRecording = false;
@@ -812,7 +823,9 @@
                         Analyze this voice transcript for a customer order: "${transcribedText}"
                         
                         1. Detect the language of the transcript (English, Khmer, or Burmese).
-                        2. Extract the items requested and their quantities.
+                        2. Extract the items requested and their quantities. 
+                           - IMPORTANT RULE: If the customer lists multiple items but doesn't say a number/quantity (e.g., "fried rice and coca cola"), you MUST assume the quantity is 1 for each item.
+                           - Extract EVERY distinct item they mention, even if spoken quickly in one long sentence.
                         3. Estimate a standard, realistic market price for each item. 
                         4. Calculate the total for each item (qty * price).
                         5. Calculate the grand total.
@@ -822,9 +835,9 @@
                         {
                             "detected_language": "Language Name",
                             "items": [
-                                { "name": "Item Name", "qty": 2, "price": 5.00, "total": 10.00 }
+                                { "name": "Item Name", "qty": 1, "price": 5.00, "total": 5.00 }
                             ],
-                            "total": 10.00,
+                            "total": 5.00,
                             "currency": "CURRENCY_CODE"
                         }
                     `;
@@ -914,7 +927,9 @@
             function startRecording() {
                 if (!recognition) return;
                 
-                // Removing manual language selection allows the browser to attempt multi-lingual/default detection
+                // CRITICAL FIX: Tell the microphone which language to listen for
+                recognition.lang = currentVoiceLang; 
+                
                 startRecordingUI();
                 
                 try {
@@ -1007,6 +1022,26 @@
                 } else {
                     stopRecording();
                 }
+            });
+            
+            // Event Listeners for Language Toggle
+            langBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    triggerVibration();
+                    // Remove active state from all
+                    langBtns.forEach(b => {
+                        b.classList.remove('active', 'bg-white', 'shadow-sm', 'text-purple-700', 'font-bold');
+                        b.classList.add('text-gray-500', 'font-semibold');
+                    });
+                    
+                    // Add active state to clicked button
+                    const clicked = e.target;
+                    clicked.classList.remove('text-gray-500', 'font-semibold');
+                    clicked.classList.add('active', 'bg-white', 'shadow-sm', 'text-purple-700', 'font-bold');
+                    
+                    // Update the state variable
+                    currentVoiceLang = clicked.getAttribute('data-lang');
+                });
             });
 
             btnBack.addEventListener('click', () => { triggerVibration(); resetToStart(); });
